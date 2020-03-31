@@ -1,7 +1,11 @@
-# Analysis of UK COVID-19 burdens
+# - - - - - - - - - - - - - - - - - - - - - - - 
+# UK model: load data and analyse scenarios
+# - - - - - - - - - - - - - - - - - - - - - - - 
 
 library(rlang)
 library(stringr)
+
+# Set up parameters and functions -------------------------------------------------------
 
 # covidm options
 cm_path = "~/Dropbox/nCoV/covidm/";
@@ -196,6 +200,8 @@ add_dynamics = function(run, dynamics, iv)
         csvlines
     ))
 }
+
+# Run model -------------------------------------------------------
 
 #############
 # MAIN CODE #

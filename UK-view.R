@@ -1,13 +1,16 @@
-# show results from UK analysis
-# TODO peak_during and peak_after??
-# TODO during intervention and total??
-# TODO plot by date, not by day since outbreak start?
+# - - - - - - - - - - - - - - - - - - - - - - - 
+# UK model: plot outputs
+# - - - - - - - - - - - - - - - - - - - - - - - 
+
 library(cowplot)
 library(stringr)
 library(rlang)
 
+# Set up parameters and functions -------------------------------------------------------
+
+# Set local path
 cm_path = "~/Dropbox/nCoV/covidm/"; ### CHANGE THIS to reflect the path to covidm.
-if(grepl(Sys.info()["user"], pattern = "^adamkuchars(ki)?$")){cm_path = "~/Documents/GitHub/covidm/"}
+if(grepl(Sys.info()["user"], pattern = "^adamkuchars(ki)?$")){cm_path = "~/Documents/GitHub/covid-uk/"}
 source(paste0(cm_path, "/R/covidm.R"))
 
 # Friendly number
@@ -61,7 +64,8 @@ deaths, peak, week
 beds_icu, peak, t
 beds_nonicu, peak, t
 cases, peak_time, week")
-        
+
+# Plot outputs and export tables -------------------------------------------------------
 
 make_table = function(d)
 {
