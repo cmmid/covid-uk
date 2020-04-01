@@ -1,6 +1,14 @@
+Icon?
+
 .DS_Store
 
 *.qs
+
+*.pdf
+
+*.png
+
+*.csv
 
 output/
 
