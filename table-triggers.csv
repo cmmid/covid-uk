@@ -1,8 +1,0 @@
-statistic,Base,Local trigger,National trigger,"Local trigger, +2 weeks","National trigger, +2 weeks","Local trigger, +4 weeks","National trigger, +4 weeks","Local trigger, +8 weeks","National trigger, +8 weeks"
-Total cases,24 M (16 M–30 M),18 M (11 M–24 M),18 M (11 M–24 M),17 M (10 M–22 M),17 M (11 M–22 M),15 M (9.4 M–20 M),15 M (9.3 M–20 M),16 M (8.2 M–24 M),16 M (8.6 M–24 M)
-Total deaths,370 k (250 k–470 k),280 k (160 k–370 k),280 k (150 k–390 k),250 k (150 k–330 k),260 k (150 k–330 k),210 k (130 k–290 k),210 k (130 k–280 k),230 k (110 k–390 k),220 k (120 k–380 k)
-Cases in peak week,4.2 M (2.5 M–6.4 M),3.1 M (1.1 M–4.5 M),3.5 M (1.2 M–5.3 M),1.9 M (1 M–2.7 M),2.4 M (1.2 M–3.6 M),1.1 M (630 k–3.1 M),1.2 M (670 k–2.7 M),2.8 M (760 k–7.1 M),3.2 M (970 k–7.1 M)
-Deaths in peak week,62 k (35 k–98 k),45 k (16 k–66 k),51 k (17 k–82 k),28 k (15 k–40 k),35 k (17 k–50 k),15 k (9 k–41 k),17 k (10 k–36 k),40 k (9.5 k–99 k),43 k (12 k–100 k)
-Peak ICU beds required,220 k (120 k–360 k),170 k (57 k–240 k),190 k (61 k–300 k),100 k (53 k–140 k),130 k (59 k–180 k),54 k (32 k–150 k),59 k (37 k–130 k),140 k (34 k–380 k),160 k (44 k–380 k)
-Peak non-ICU beds required,420 k (230 k–670 k),310 k (110 k–450 k),350 k (120 k–570 k),190 k (100 k–270 k),240 k (110 k–350 k),100 k (61 k–280 k),110 k (70 k–240 k),270 k (64 k–720 k),300 k (84 k–730 k)
-Time to peak cases (weeks),11 (8.2–16),22 (15–36),22 (16–36),23 (12–37),23 (12–37),13 (9.2–38),24 (10–38),13 (9.2–18),13 (9.2–18)
