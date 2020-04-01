@@ -1,4 +1,6 @@
-# Analysis of UK COVID-19 burdens
+# - - - - - - - - - - - - - - - - - - - - - - - 
+# UK model: load data and analyse scenarios
+# - - - - - - - - - - - - - - - - - - - - - - - 
 
 library(rlang)
 library(stringr)
