@@ -1,7 +1,4 @@
 # show results from UK analysis
-# TODO peak_during and peak_after??
-# TODO during intervention and total??
-# TODO plot by date, not by day since outbreak start?
 library(cowplot)
 library(stringr)
 library(rlang)
@@ -60,8 +57,17 @@ cases, peak, week
 deaths, peak, week
 beds_icu, peak, t
 beds_nonicu, peak, t
-cases, peak_time, week")
-        
+cases, peak_time, week
+trace_lockdown, lockdown_duration, t
+subclinical, total, t")
+
+median_ci = function(x, conf = 0.95)
+{
+    y = quantile(x, c((1 - conf) / 2, 0.5, 1 - (1 - conf) / 2));
+    y = as.list(y);
+    names(y) = c("lower", "median", "upper");
+    return (y)
+}
 
 make_table = function(d)
 {
@@ -76,33 +82,48 @@ make_table = function(d)
         if (stat == "total") {
             res = d[region == "United Kingdom" & compartment == comp, .(x = sum(value)), by = .(scenario, run, region)];
             res[, statistic := paste(stat, comp)];
-            res = res[, cm_mean_hdi(x), by = .(scenario, region, statistic)];
+            res = res[, median_ci(x), by = .(scenario, region, statistic)];
             stat_nice = paste("Total", comp);
         } else if (stat == "peak") {
             res = d[region == "United Kingdom" & compartment == comp, .(x = sum(value)), by = c("scenario", "run", time, "region")];
             res = res[, .(x = max(x)), by = .(scenario, run, region)];
             res[, statistic := paste(stat, comp)];
-            res = res[, cm_mean_hdi(x), by = .(scenario, region, statistic)];
-            stat_nice = ifelse(time == "t", paste("Peak", comp, "occupied"),
+            res = res[, median_ci(x), by = .(scenario, region, statistic)];
+            stat_nice = ifelse(time == "t", paste("Peak", comp, "required"),
                 paste(comp, "in peak week"));
         } else if (stat == "peak_time") {
             res = d[region == "United Kingdom" & compartment == comp, .(x = sum(value)), by = c("scenario", "run", time, "region")];
             res = res[, .(x = get(time)[which.max(x)]), by = .(scenario, run, region)];
             res[, statistic := paste(stat, comp)];
-            res = res[, cm_mean_hdi(x), by = .(scenario, region, statistic)];
+            res = res[, median_ci(x), by = .(scenario, region, statistic)];
             stat_nice = paste("Time to peak", comp, ifelse(time == "t", "(days)", "(weeks)"));
+        } else if (stat == "lockdown_duration") {
+            if (d[compartment == comp, .N] == 0) { 
+                next;
+            }
+            res = d[region == "All" & compartment == comp, .(x = mean(value - 1)), by = .(scenario, run, region)];
+            res[, statistic := paste(stat, comp)];
+            res = res[, median_ci(x), by = .(scenario, region, statistic)];
+            stat_nice = paste("Proportion of time spent in", comp);
+        } else if (stat == "total_end") {
+            res = d[region == "United Kingdom" & compartment == comp & t == max(t), .(x = sum(value)), by = .(scenario, run, region)];
+            res[, statistic := paste(stat, comp)];
+            res = res[, median_ci(x), by = .(scenario, region, statistic)];
+            stat_nice = paste("Number of ", comp, " at simulation end");
         } else {
             stop("Unrecognised stat.");
         }
         stat_nice = str_to_sentence(stat_nice);
         stat_nice = str_replace(stat_nice, "beds_icu", "ICU beds");
         stat_nice = str_replace(stat_nice, "beds_nonicu", "non-ICU beds");
+        stat_nice = str_replace(stat_nice, "trace_lockdown", "lockdown");
+        stat_nice = str_replace(stat_nice, "S", "susceptibles");
         res[, statistic := stat_nice]
         results = rbind(results, res);
     }
     
     results[, value_str := 
-        paste0(friendly(mean), " (", friendly(lower), "–", friendly(upper), ")")];
+        paste0(friendly(median), " (", friendly(lower), "–", friendly(upper), ")")];
     results[, statistic := factor(statistic, levels = unique(statistic))]
     results[, scenario := factor(scenario, levels = unique(scenario))]
     results
@@ -117,7 +138,7 @@ save_table = function(tb, filename)
 plot_table = function(tb, nrow = NULL)
 {
     ggplot(tb) +
-        geom_pointrange(aes(x = scenario, y = mean, ymin = lower, ymax = upper, colour = scenario), size = 0.25, fatten = 0.2) +
+        geom_pointrange(aes(x = scenario, y = median, ymin = lower, ymax = upper, colour = scenario), size = 0.25, fatten = 0.2) +
         facet_wrap(~statistic, scales = "free", nrow = nrow) +
         labs(x = NULL, y = NULL) +
         scale_y_continuous(labels = axis_friendly, limits = c(0, NA)) +
@@ -133,12 +154,12 @@ plot_attackrate = function(t)
     ts[, age_group := factor(age_group, levels = unique(age_group))];
     
     ts[, total := sum(total), by = .(scenario, run, compartment, age_group)];
-    ts = ts[compartment %in% c("cases", "deaths"), cm_mean_hdi(total), by = .(scenario, compartment, age_group)];
+    ts = ts[compartment %in% c("cases", "deaths"), median_ci(total), by = .(scenario, compartment, age_group)];
     ts[, compartment := paste(str_to_sentence(as.character(compartment), "(thousands)"))];
     ts[, scenario := factor(scenario, levels = unique(scenario))];
     
     ggplot(ts) +
-        geom_col(aes(x = age_group, y = mean / 1000, fill = scenario)) +
+        geom_col(aes(x = age_group, y = median / 1000, fill = scenario)) +
         geom_linerange(aes(x = age_group, ymin = lower / 1000, ymax = upper / 1000), size = 0.25) +
         facet_grid(compartment~scenario, switch = "y", scales = "free") +
         labs(x = NULL, y = NULL) +
@@ -179,8 +200,8 @@ plot_example = function(d0, t, quant, ymd_start, ymd_truncate = "2050-01-01")
     # Give nice names
     d[compartment == "cases", compartment := "Cases"];
     d[compartment == "deaths", compartment := "Deaths"];
-    d[compartment == "beds_icu", compartment := "ICU beds\noccupied"];
-    d[compartment == "beds_nonicu", compartment := "Non-ICU beds\noccupied"];
+    d[compartment == "beds_icu", compartment := "ICU beds\nrequired"];
+    d[compartment == "beds_nonicu", compartment := "Non-ICU beds\nrequired"];
     d[, compartment := factor(compartment, levels = unique(compartment))];
     
     d[, date := ymd(ymd_start) + t];
@@ -199,7 +220,7 @@ plot_example = function(d0, t, quant, ymd_start, ymd_truncate = "2050-01-01")
         labs(x = NULL, y = NULL);
 }
 
-plot_epi = function(d0, t, quant, ymd_start, ymd_truncate = "2050-01-01", colours = NULL, maxy = NA, which_region = "United Kingdom")
+plot_epi = function(d0, t, quant, ymd_start, ymd_truncate = "2050-01-01", colours = NULL, maxy = NA, which_region = "United Kingdom", exclude = NULL)
 {
     # Copy data and process
     d = duplicate(d0[region %in% c(which_region, "All")])
@@ -234,21 +255,21 @@ plot_epi = function(d0, t, quant, ymd_start, ymd_truncate = "2050-01-01", colour
     # Give nice names
     d[compartment == "cases", compartment := "New cases"];
     d[compartment == "deaths", compartment := "Deaths"];
-    d[compartment == "beds_icu", compartment := "ICU beds\noccupied"];
-    d[compartment == "beds_nonicu", compartment := "Non-ICU beds\noccupied"];
+    d[compartment == "beds_icu", compartment := "ICU beds\nrequired"];
+    d[compartment == "beds_nonicu", compartment := "Non-ICU beds\nrequired"];
     d[, compartment := factor(compartment, levels = unique(compartment))];
 
     d[, date := ymd(ymd_start) + t];
 
     # Plot
-    plot = ggplot(d[region == which_region & date <= ymd(ymd_truncate)]) +
+    plot = ggplot(d[region == which_region & date <= ymd(ymd_truncate) & !(scenario %in% exclude)]) +
         geom_line(aes(x = date, y = value, colour = scenario, group = run), size = 0.25, alpha = 0.35) +
-        geom_ribbon(aes(x = date, ymin = 0, ymax = trace_school, group = run), fill = "#0000ff", alpha = 0.1) +
-        geom_ribbon(aes(x = date, ymin = 0, ymax = trace_intervention, group = run), fill = "#ff0000", alpha = 0.2) +
+        geom_ribbon(aes(x = date, ymin = 0, ymax = trace_school, group = run), fill = "#0000ff", alpha = 0.1/length(quant)) +
+        geom_ribbon(aes(x = date, ymin = 0, ymax = trace_intervention, group = run), fill = "#ff0000", alpha = 0.2/length(quant)) +
         geom_ribbon(aes(x = date, ymin = 0, ymax = trace_lockdown, group = run), fill = "#000000", alpha = 0.15/length(quant)) +
-        geom_line(data = d[region == which_region & date <= ymd(ymd_truncate) & run == mrun], 
+        geom_line(data = d[region == which_region & date <= ymd(ymd_truncate) & run == mrun & !(scenario %in% exclude)], 
             aes(x = date, y = value, colour = scenario), size = 0.6) +
-        facet_grid(compartment ~ scenario, switch = "y", scales = "free", space = "free_x") +
+        facet_grid(compartment ~ scenario, switch = "y", scales = "free") +
         scale_y_continuous(labels = axis_friendly, limits = c(0, NA)) +
         scale_x_date(date_breaks = "1 month", labels = axis_date) +
         theme(strip.background = element_blank(), strip.placement = "outside", 
@@ -306,10 +327,11 @@ pla2 = plot_epi(d1[compartment != "deaths" & compartment != "beds_nonicu" &
         !(scenario %in% c("Base", "School Closures", "Social Distancing"))], t1, (0:10)/10, "2020-01-29", "2020-10-15",
         colours = cols6[4:6]);
 tb1[statistic == "Cases in peak week", statistic := "Cases in\npeak week"];
-tb1[statistic == "Peak ICU beds occupied", statistic := "Peak ICU beds\noccupied"];
-tb1[statistic == "Peak non-ICU beds occupied", statistic := "Peak non-ICU beds\noccupied"];
+tb1[statistic == "Peak ICU beds required", statistic := "Peak ICU beds\nrequired"];
+tb1[statistic == "Peak non-ICU beds required", statistic := "Peak non-ICU beds\nrequired"];
 tb1[statistic == "Time to peak cases (weeks)", statistic := "Time to peak\ncases (weeks)"];
-plb = plot_table(tb1[statistic != "Deaths in peak week"]) + theme(legend.position = "bottom") + guides(colour = guide_legend(nrow = 2, byrow = TRUE))
+plb = plot_table(tb1[statistic != "Deaths in peak week"]) + theme(legend.position = "bottom") + 
+    guides(colour = guide_legend(nrow = 2, byrow = TRUE)) + labs(colour = NULL)
 r0s1 = r0s[!(scenario %like% "Intensive") & !(scenario %like% "Lockdown")];
 r0s1[, scenario := factor(scenario, levels = unique(scenario))];
 plR = ggplot(r0s1) +
@@ -327,6 +349,7 @@ ggsave("~/Dropbox/COVID-UK/fig-12week.pdf", f, width = 20, height = 12, units = 
 d2.1[scenario != "Base", scenario := paste(scenario, "national")]
 d2.2[scenario != "Base", scenario := paste(scenario, "local")]
 d2 = rbind(d2.1, d2.2[scenario != "Base"])
+t2 = rbind(t2.1, t2.2[scenario != "Base"])
 d2[scenario == "Combination 0 shift local", scenario := "Local trigger"]
 d2[scenario == "Combination 14 shift local", scenario := "Local trigger, +2 weeks"]
 d2[scenario == "Combination 28 shift local", scenario := "Local trigger, +4 weeks"]
@@ -344,18 +367,18 @@ tb2 = make_table(d2)
 pl1 = plot_table(tb2)
 save_table(tb2, "~/Dropbox/COVID-UK/table-triggers.csv");
 pl2 = plot_attackrate(t2)
-pl3 = plot_epi(d2[scenario != "Base"], t2, (0:10)/10, "2020-01-29")
+pl3 = plot_epi(d2, t2, (0:10)/10, "2020-01-29")
 f = plot_grid(pl1, pl2, pl3, ncol = 1, rel_heights = c(6, 6, 10), labels = c("a", "b", "c"), label_size = 9);
 ggsave("~/Dropbox/COVID-UK/full-2.pdf", f, width = 20, height = 22, units = "cm", useDingbats = F);
 
 pla1 = plot_epi(d2[compartment != "deaths" & compartment != "beds_nonicu" & compartment != "beds_icu" &
-        scenario %like% "Local"], t2, (0:10)/10, "2020-01-29", "2020-8-31");
+        scenario %like% "Local"], t2, (0:10)/10, "2020-01-29", "2020-8-31", exclude = "Base");
 pla2 = plot_epi(d2[compartment != "deaths" & compartment != "beds_nonicu" & compartment != "beds_icu" &
-        scenario %like% "National"], t2, (0:10)/10, "2020-01-29", "2020-8-31");
+        scenario %like% "National"], t2, (0:10)/10, "2020-01-29", "2020-8-31", exclude = "Base");
 
 tb2[statistic == "Cases in peak week", statistic := "Cases in\npeak week"];
-tb2[statistic == "Peak ICU beds occupied", statistic := "Peak ICU beds\noccupied"];
-tb2[statistic == "Peak non-ICU beds occupied", statistic := "Peak non-ICU beds\noccupied"];
+tb2[statistic == "Peak ICU beds required", statistic := "Peak ICU beds\nrequired"];
+tb2[statistic == "Peak non-ICU beds required", statistic := "Peak non-ICU beds\nrequired"];
 tb2[statistic == "Time to peak cases (weeks)", statistic := "Time to peak\ncases (weeks)"];
 plb = plot_table(tb2[statistic != "Deaths in peak week"], nrow = 3) + theme(legend.position = "bottom") +
     guides(colour = guide_legend(nrow = 5, byrow = F)) + labs(colour = NULL)
@@ -382,6 +405,8 @@ d3[scenario == "Intensive Interventions NA lockdown", scenario := "Intensive Int
 d3[scenario == "Intensive Interventions 1000 lockdown", scenario := "Lockdown 1000-bed trigger"];
 d3[scenario == "Intensive Interventions 2000 lockdown", scenario := "Lockdown 2000-bed trigger"];
 d3[scenario == "Intensive Interventions 5000 lockdown", scenario := "Lockdown 5000-bed trigger"];
+#d3[compartment == "subclinical"]$value = d3[compartment == "subclinical"]$value + d3[compartment == "cases"]$value
+
 tb3 = make_table(d3)
 pl1 = plot_table(tb3)
 save_table(tb3, "~/Dropbox/COVID-UK/table-lockdown.csv");
@@ -391,22 +416,26 @@ f = plot_grid(pl1, pl2, pl3, ncol = 1, rel_heights = c(6, 6, 10), labels = c("a"
 ggsave("~/Dropbox/COVID-UK/full-3.pdf", f, width = 20, height = 22, units = "cm", useDingbats = F);
 
 tb3[statistic == "Cases in peak week", statistic := "Cases in\npeak week"];
-tb3[statistic == "Peak ICU beds occupied", statistic := "Peak ICU beds\noccupied"];
-tb3[statistic == "Peak non-ICU beds occupied", statistic := "Peak non-ICU beds\noccupied"];
+tb3[statistic == "Peak ICU beds required", statistic := "Peak ICU beds\nrequired"];
+tb3[statistic == "Peak non-ICU beds required", statistic := "Peak non-ICU beds\nrequired"];
 tb3[statistic == "Time to peak cases (weeks)", statistic := "Time to peak\ncases (weeks)"];
-plb = plot_table(tb3[statistic != "Deaths in peak week"]) + theme(legend.position = "bottom") + guides(colour = guide_legend(nrow = 3, byrow = TRUE))
+tb3[statistic == "Proportion of time spent in lockdown", statistic := "Proportion of time\nspent in lockdown"];
+plb = plot_table(tb3[statistic != "Deaths in peak week" & statistic != "Time to peak\ncases (weeks)" & statistic != "Total subclinical" & scenario != "Base"]) + 
+    theme(legend.position = "bottom") + guides(colour = guide_legend(nrow = 3, byrow = TRUE)) + labs(colour = NULL) +
+    scale_colour_manual(values = cols5[2:5])
 
 d3 = d3[scenario != "Base"]
 d3 = d3[scenario != "Intensive Interventions" | t < 425]
 d3 = d3[scenario == "Intensive Interventions" | t < 575]
 pla1 = plot_epi(d3[compartment != "deaths" & compartment != "beds_nonicu" & compartment != "cases" & 
         scenario %in% c("Intensive Interventions", "Lockdown 1000-bed trigger")], t3, (0:10)/10, "2020-01-29", 
-        colours = cols5[2:3], maxy = 26000) + geom_hline(data = data.table(scenario = "Lockdown 1000-bed trigger", beds = c(4562, 9124), lt = c("a", "b")),
+        colours = cols5[2:3], maxy = 26000) + geom_hline(data = data.table(scenario = c("Intensive Interventions", "Intensive Interventions", "Lockdown 1000-bed trigger", "Lockdown 1000-bed trigger"), 
+            beds = c(4562, 9124, 4562, 9124), lt = c("a", "b", "a", "b")),
             aes(yintercept = beds, linetype = lt), size = 0.25)
 pla2 = plot_epi(d3[compartment != "deaths" & compartment != "beds_nonicu" & compartment != "cases" & 
         scenario %in% c("Lockdown 2000-bed trigger", "Lockdown 5000-bed trigger")], t3, (0:10)/10, "2020-01-29",
         colours = cols5[4:5], maxy = 26000) + geom_hline(data = data.table(scenario = c("Lockdown 2000-bed trigger", "Lockdown 2000-bed trigger", "Lockdown 5000-bed trigger", "Lockdown 5000-bed trigger"),
-            beds = c(4800, 9600, 4800, 9600), lt = c("a", "b", "a", "b")),
+            beds = c(4562, 9124, 4562, 9124), lt = c("a", "b", "a", "b")),
             aes(yintercept = beds, linetype = lt), size = 0.25)
 
 r0s2 = r0s[scenario %like% "Base" | scenario %like% "Intensive" | scenario %like% "Lockdown"]
@@ -427,6 +456,11 @@ ggsave("~/Dropbox/COVID-UK/fig-lockdown.pdf", f, width = 20, height = 12, units 
 
 # ANALYSES 4,6 - GRANDPARENTS AND SPORTS/LEISURE
 # Grandparents
+d4[scenario == "Intensive", scenario := "Background"]
+d4[scenario == "Intensive + School", scenario := "School closure"]
+d4[scenario == "Intensive + School + G20", scenario := "School closure, 20% care by elderly"]
+d4[scenario == "Intensive + School + G50", scenario := "School closure, 50% care by elderly"]
+d4[scenario == "Intensive + School + G100", scenario := "School closure, 100% care by elderly"]
 tb4 = make_table(d4)
 pl1 = plot_table(tb4)
 save_table(tb4, "~/Dropbox/COVID-UK/table-grandparents.csv");
@@ -436,12 +470,16 @@ f = plot_grid(pl1, pl2, pl3, ncol = 1, rel_heights = c(6, 6, 10), labels = c("a"
 ggsave("~/Dropbox/COVID-UK/full-4.pdf", f, width = 20, height = 22, units = "cm", useDingbats = F);
 
 tb4[statistic == "Cases in peak week", statistic := "Cases in\npeak week"];
-tb4[statistic == "Peak ICU beds occupied", statistic := "Peak ICU beds\noccupied"];
-tb4[statistic == "Peak non-ICU beds occupied", statistic := "Peak non-ICU beds\noccupied"];
+tb4[statistic == "Peak ICU beds required", statistic := "Peak ICU beds\nrequired"];
+tb4[statistic == "Peak non-ICU beds required", statistic := "Peak non-ICU beds\nrequired"];
 tb4[statistic == "Time to peak cases (weeks)", statistic := "Time to peak\ncases (weeks)"];
-plb = plot_table(tb4[scenario != "Base" & statistic != "Deaths in peak week"]) + theme(legend.position = "bottom") + guides(colour = guide_legend(nrow = 3, byrow = TRUE))
+plb = plot_table(tb4[scenario != "Base" & statistic != "Deaths in peak week"]) + theme(legend.position = "bottom") + 
+    guides(colour = guide_legend(nrow = 3, byrow = TRUE)) + labs(colour = NULL)
 
 # Sports and leisure
+d6[scenario == "Background", scenario := "Background"]
+d6[scenario == "Background + 0% Sports", scenario := "Spectator sports banned"]
+d6[scenario == "Background + 25% Leisure", scenario := "Leisure reduced by 75%"]
 tb6 = make_table(d6)
 pl1 = plot_table(tb6)
 save_table(tb6, "~/Dropbox/COVID-UK/table-sports.csv");
@@ -451,13 +489,15 @@ f = plot_grid(pl1, pl2, pl3, ncol = 1, rel_heights = c(6, 6, 10), labels = c("a"
 ggsave("~/Dropbox/COVID-UK/full-sports.pdf", f, width = 20, height = 22, units = "cm", useDingbats = F);
 
 tb6[statistic == "Cases in peak week", statistic := "Cases in\npeak week"];
-tb6[statistic == "Peak ICU beds occupied", statistic := "Peak ICU beds\noccupied"];
-tb6[statistic == "Peak non-ICU beds occupied", statistic := "Peak non-ICU beds\noccupied"];
+tb6[statistic == "Peak ICU beds required", statistic := "Peak ICU beds\nrequired"];
+tb6[statistic == "Peak non-ICU beds required", statistic := "Peak non-ICU beds\nrequired"];
 tb6[statistic == "Time to peak cases (weeks)", statistic := "Time to peak\ncases (weeks)"];
-pla = plot_table(tb6[scenario != "Base" & statistic != "Deaths in peak week"]) + theme(legend.position = "bottom") + guides(colour = guide_legend(nrow = 3, byrow = TRUE))
+pla = plot_table(tb6[scenario != "Base" & statistic != "Deaths in peak week"]) + theme(legend.position = "bottom") + 
+    guides(colour = guide_legend(nrow = 3, byrow = TRUE)) + labs(colour = NULL)
 f = plot_grid(pla, plb, nrow = 2, labels = c("a", "b"), label_size = 9, align = "hv", axis = "bottom");
 ggsave("~/Dropbox/COVID-UK/fig-misc.pdf", f, width = 9, height = 12, units = "cm", useDingbats = F);
 
 
-
-
+# NINGBO EST.
+x = rbeta(100000, 6, 140)/rbeta(100000, 126, 1875)
+cm_mean_hdi(x)

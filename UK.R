@@ -106,18 +106,8 @@ observer_lockdown = function(lockdown_trigger) function(time, dynamics)
     icu_prevalence = dynamics[t == time, sum(icu_p)];
     
     # Determine lockdown trigger
-    if (lockdown_trigger < 0) {
-        if (time < 52) { # up to April 12th
-            trigger = 2000;
-        } else if (time < 101) { # up to May 31st
-            trigger = 4000;
-        } else { # June 1st onwards
-            trigger = 10000;
-        }
-    } else {
-        trigger = lockdown_trigger;
-    }
-    
+    trigger = lockdown_trigger;
+
     # If ICU prevalence exceeds a threshold, turn on lockdown
     if (icu_prevalence >= trigger) {
         return (list(csv = paste(time, "trace_lockdown", "All", 2, sep = ","),
