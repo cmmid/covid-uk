@@ -6,7 +6,12 @@ library(cowplot)
 library(stringr)
 library(rlang)
 
-cm_path = "~/Dropbox/nCoV/covidm/"; ### CHANGE THIS to reflect the path to covidm.
+# Set path
+# Set this path to the base directory of the repository.
+covid_uk_path = "~/Dropbox/COVID-UK"
+
+# covidm options
+cm_path = paste0(covid_uk_path, "/covidm/");
 if(grepl(Sys.info()["user"], pattern = "^adamkuchars(ki)?$")){cm_path = "~/Documents/GitHub/covidm/"}
 source(paste0(cm_path, "/R/covidm.R"))
 
@@ -292,28 +297,28 @@ plot_epi = function(d0, t, quant, ymd_start, ymd_truncate = "2050-01-01", colour
 theme_set(theme_cowplot(font_size = 7, line_size = 0.25))
 
 # load data
-d1 = reflow_dynamics(qread("~/Dropbox/COVID-UK/1-dynamics.qs"));
-t1 = reflow_totals(qread("~/Dropbox/COVID-UK/1-totals.qs"));
-d2.1 = reflow_dynamics(qread("~/Dropbox/COVID-UK/2.1-dynamics.qs"));
-t2.1 = reflow_totals(qread("~/Dropbox/COVID-UK/2.1-totals.qs"));
-d2.2 = reflow_dynamics(qread("~/Dropbox/COVID-UK/2.2-dynamics.qs"));
-t2.2 = reflow_totals(qread("~/Dropbox/COVID-UK/2.2-totals.qs"));
-d3 = reflow_dynamics(qread("~/Dropbox/COVID-UK/3-dynamics.qs"));
-t3 = reflow_totals(qread("~/Dropbox/COVID-UK/3-totals.qs"));
-d4 = reflow_dynamics(qread("~/Dropbox/COVID-UK/4-dynamics.qs"));
-t4 = reflow_totals(qread("~/Dropbox/COVID-UK/4-totals.qs"));
-d6 = reflow_dynamics(qread("~/Dropbox/COVID-UK/6-dynamics.qs"));
-t6 = reflow_totals(qread("~/Dropbox/COVID-UK/6-totals.qs"));
-r0s = qread("~/Dropbox/COVID-UK/5-dynamics.qs");
+d1 =   reflow_dynamics(qread(paste0(covid_uk_path, "/1-dynamics.qs")));
+t1 =     reflow_totals(qread(paste0(covid_uk_path, "/1-totals.qs")));
+d2.1 = reflow_dynamics(qread(paste0(covid_uk_path, "/2.1-dynamics.qs")));
+t2.1 =   reflow_totals(qread(paste0(covid_uk_path, "/2.1-totals.qs")));
+d2.2 = reflow_dynamics(qread(paste0(covid_uk_path, "/2.2-dynamics.qs")));
+t2.2 =   reflow_totals(qread(paste0(covid_uk_path, "/2.2-totals.qs")));
+d3 =   reflow_dynamics(qread(paste0(covid_uk_path, "/3-dynamics.qs")));
+t3 =     reflow_totals(qread(paste0(covid_uk_path, "/3-totals.qs")));
+d4 =   reflow_dynamics(qread(paste0(covid_uk_path, "/4-dynamics.qs")));
+t4 =     reflow_totals(qread(paste0(covid_uk_path, "/4-totals.qs")));
+d6 =   reflow_dynamics(qread(paste0(covid_uk_path, "/6-dynamics.qs")));
+t6 =     reflow_totals(qread(paste0(covid_uk_path, "/6-totals.qs")));
+r0s =                  qread(paste0(covid_uk_path, "/5-dynamics.qs"));
 
 # ANALYSIS 1 - 12 WEEK INTERVENTIONS
 tb1 = make_table(d1)
 pl1 = plot_table(tb1)
-save_table(tb1, "~/Dropbox/COVID-UK/table-12week.csv");
+save_table(tb1, paste0(covid_uk_path, "/table-12week.csv"));
 pl2 = plot_attackrate(t1)
 pl3 = plot_epi(d1, t1, (0:10)/10, "2020-01-29", "2020-10-15")
 f = plot_grid(pl1, pl2, pl3, ncol = 1, rel_heights = c(6, 6, 10), labels = c("a", "b", "c"), label_size = 9);
-ggsave("~/Dropbox/COVID-UK/full-1.pdf", f, width = 20, height = 22, units = "cm", useDingbats = F);
+ggsave(paste0(covid_uk_path, "/full-1.pdf"), f, width = 20, height = 22, units = "cm", useDingbats = F);
 
 gg_color_hue = function(n) {
   hues = seq(15, 375, length = n + 1)
@@ -346,7 +351,7 @@ plR = ggplot(r0s1) +
     xlim(0, NA)
 f = plot_grid(pla1, plb, pla2, plR, 
     nrow = 2, ncol = 2, rel_widths = c(3, 2), labels = c("a", "b", "", "c"), label_size = 9, align = "hv", axis = "bottom")
-ggsave("~/Dropbox/COVID-UK/fig-12week.pdf", f, width = 20, height = 12, units = "cm", useDingbats = F);
+ggsave(paste0(covid_uk_path, "/fig-12week.pdf"), f, width = 20, height = 12, units = "cm", useDingbats = F);
 
 # ANALYSIS 2 - TRIGGERS
 d2.1[scenario != "Base", scenario := paste(scenario, "national")]
@@ -368,11 +373,11 @@ d2[, scenario := factor(scenario, levels = c("Base", "Local trigger", "National 
 d2 = d2[order(d2$scenario)]
 tb2 = make_table(d2)
 pl1 = plot_table(tb2)
-save_table(tb2, "~/Dropbox/COVID-UK/table-triggers.csv");
+save_table(tb2, paste0(covid_uk_path, "/table-triggers.csv"));
 pl2 = plot_attackrate(t2)
 pl3 = plot_epi(d2, t2, (0:10)/10, "2020-01-29")
 f = plot_grid(pl1, pl2, pl3, ncol = 1, rel_heights = c(6, 6, 10), labels = c("a", "b", "c"), label_size = 9);
-ggsave("~/Dropbox/COVID-UK/full-2.pdf", f, width = 20, height = 22, units = "cm", useDingbats = F);
+ggsave(paste0(covid_uk_path, "/COVID-UK/full-2.pdf"), f, width = 20, height = 22, units = "cm", useDingbats = F);
 
 pla1 = plot_epi(d2[compartment != "deaths" & compartment != "beds_nonicu" & compartment != "beds_icu" &
         scenario %like% "Local"], t2, (0:10)/10, "2020-01-29", "2020-8-31", exclude = "Base");
@@ -401,7 +406,7 @@ plc = plot_grid(plc1, plc2, plc3, nrow = 3, align = "v", axis = "bottom", rel_he
 
 f = plot_grid(pla, plb, plc,
     ncol = 3, labels = c("a", "b", "c"), label_size = 9, rel_widths = c(2, 1, .5))
-ggsave("~/Dropbox/COVID-UK/fig-triggers.pdf", f, width = 20, height = 8, units = "cm", useDingbats = F);
+ggsave(paste0(covid_uk_path, "/fig-triggers.pdf"), f, width = 20, height = 8, units = "cm", useDingbats = F);
 
 # ANALYSIS 3 - LOCKDOWN
 d3[scenario == "Intensive Interventions NA lockdown", scenario := "Intensive Interventions"];
@@ -412,11 +417,11 @@ d3[scenario == "Intensive Interventions 5000 lockdown", scenario := "Lockdown 50
 
 tb3 = make_table(d3)
 pl1 = plot_table(tb3)
-save_table(tb3, "~/Dropbox/COVID-UK/table-lockdown.csv");
+save_table(tb3, paste0(covid_uk_path, "/table-lockdown.csv"));
 pl2 = plot_attackrate(t3)
 pl3 = plot_epi(d3[scenario != "Base"], t3, (0:10)/10, "2020-01-29")
 f = plot_grid(pl1, pl2, pl3, ncol = 1, rel_heights = c(6, 6, 10), labels = c("a", "b", "c"), label_size = 9);
-ggsave("~/Dropbox/COVID-UK/full-3.pdf", f, width = 20, height = 22, units = "cm", useDingbats = F);
+ggsave(paste0(covid_uk_path, "/full-3.pdf"), f, width = 20, height = 22, units = "cm", useDingbats = F);
 
 tb3[statistic == "Cases in peak week", statistic := "Cases in\npeak week"];
 tb3[statistic == "Peak ICU beds required", statistic := "Peak ICU beds\nrequired"];
@@ -455,7 +460,7 @@ plR = ggplot(r0s2) +
     scale_fill_manual(values = c(cols5[1], cols5[2], cols5[2], "#bbbbbb"))
 f = plot_grid(pla1, plb, pla2, plR, 
     nrow = 2, ncol = 2, rel_widths = c(3, 2), labels = c("a", "b", "", "c"), label_size = 9, align = "hv", axis = "bottom")
-ggsave("~/Dropbox/COVID-UK/fig-lockdown.pdf", f, width = 20, height = 12, units = "cm", useDingbats = F);
+ggsave(paste0(covid_uk_path, "/fig-lockdown.pdf"), f, width = 20, height = 12, units = "cm", useDingbats = F);
 
 # ANALYSES 4,6 - GRANDPARENTS AND SPORTS/LEISURE
 # Grandparents
@@ -466,11 +471,11 @@ d4[scenario == "Intensive + School + G50", scenario := "School closure, 50% care
 d4[scenario == "Intensive + School + G100", scenario := "School closure, 100% care by elderly"]
 tb4 = make_table(d4)
 pl1 = plot_table(tb4)
-save_table(tb4, "~/Dropbox/COVID-UK/table-grandparents.csv");
+save_table(tb4, paste0(covid_uk_path, "/table-grandparents.csv"));
 pl2 = plot_attackrate(t4)
 pl3 = plot_epi(d4, t4, (0:10)/10, "2020-01-29", "2020-12-31")
 f = plot_grid(pl1, pl2, pl3, ncol = 1, rel_heights = c(6, 6, 10), labels = c("a", "b", "c"), label_size = 9);
-ggsave("~/Dropbox/COVID-UK/full-4.pdf", f, width = 20, height = 22, units = "cm", useDingbats = F);
+ggsave(paste0(covid_uk_path, "/full-4.pdf"), f, width = 20, height = 22, units = "cm", useDingbats = F);
 
 tb4[statistic == "Cases in peak week", statistic := "Cases in\npeak week"];
 tb4[statistic == "Peak ICU beds required", statistic := "Peak ICU beds\nrequired"];
@@ -485,11 +490,11 @@ d6[scenario == "Background + 0% Sports", scenario := "Spectator sports banned"]
 d6[scenario == "Background + 25% Leisure", scenario := "Leisure reduced by 75%"]
 tb6 = make_table(d6)
 pl1 = plot_table(tb6)
-save_table(tb6, "~/Dropbox/COVID-UK/table-sports.csv");
+save_table(tb6, paste0(covid_uk_path, "/table-sports.csv"));
 pl2 = plot_attackrate(t6)
 pl3 = plot_epi(d6, t6, (0:10)/10, "2020-01-29")
 f = plot_grid(pl1, pl2, pl3, ncol = 1, rel_heights = c(6, 6, 10), labels = c("a", "b", "c"), label_size = 9);
-ggsave("~/Dropbox/COVID-UK/full-sports.pdf", f, width = 20, height = 22, units = "cm", useDingbats = F);
+ggsave(paste0(covid_uk_path, "/full-sports.pdf"), f, width = 20, height = 22, units = "cm", useDingbats = F);
 
 tb6[statistic == "Cases in peak week", statistic := "Cases in\npeak week"];
 tb6[statistic == "Peak ICU beds required", statistic := "Peak ICU beds\nrequired"];
@@ -498,7 +503,7 @@ tb6[statistic == "Time to peak cases (weeks)", statistic := "Time to peak\ncases
 pla = plot_table(tb6[scenario != "Base" & statistic != "Deaths in peak week"]) + theme(legend.position = "bottom") + 
     guides(colour = guide_legend(nrow = 3, byrow = TRUE)) + labs(colour = NULL)
 f = plot_grid(pla, plb, nrow = 2, labels = c("a", "b"), label_size = 9, align = "hv", axis = "bottom");
-ggsave("~/Dropbox/COVID-UK/fig-misc.pdf", f, width = 9, height = 12, units = "cm", useDingbats = F);
+ggsave(paste0(covid_uk_path, "/fig-misc.pdf"), f, width = 9, height = 12, units = "cm", useDingbats = F);
 
 
 # NINGBO EST.

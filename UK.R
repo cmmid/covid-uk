@@ -5,8 +5,12 @@
 library(rlang)
 library(stringr)
 
+# Set path
+# Set this path to the base directory of the repository.
+covid_uk_path = "~/Dropbox/COVID-UK"
+
 # covidm options
-cm_path = "~/Dropbox/nCoV/covidm/";
+cm_path = paste0(covid_uk_path, "/covidm/");
 if (grepl(Sys.info()["user"], pattern = "^adamkuchars(ki)?$")) { cm_path = "~/Documents/GitHub/covidm/" }
 source(paste0(cm_path, "/R/covidm.R"))
 
@@ -122,7 +126,7 @@ observer_lockdown = function(lockdown_trigger) function(time, dynamics)
 }
 
 # Load age-varying symptomatic rate
-covid_scenario = qread("~/Dropbox/nCoV/Analyses/2-linelist_symp_fit_fIa0.5.qs");
+covid_scenario = qread(paste0(covid_uk_path, "/data/2-linelist_symp_fit_fIa0.5.qs"));
 
 # Identify London boroughs for early seeding, and regions of each country for time courses
 london = cm_structure_UK[match(str_sub(locations, 6), Name), Geography1 %like% "London"]
@@ -135,10 +139,10 @@ cumbria = cm_structure_UK[match(str_sub(locations, 6), Name), Name == "Cumbria"]
 
 save = function(run)
 {
-    if (analysis == 3) {
-        filename = paste0("~/Dropbox/COVID-UK Storage/", run$dynamics$scenario[1], "-", run$dynamics$run[1], ".qs");
-        cm_save(run, filename);
-    }
+    # if (analysis == 3) {
+    #     filename = paste0("~/Dropbox/COVID-UK Storage/", run$dynamics$scenario[1], "-", run$dynamics$run[1], ".qs");
+    #     cm_save(run, filename);
+    # }
 }
 
 add_totals = function(run, totals)
@@ -479,6 +483,6 @@ for (r in 1:n_runs) {
       }
     }
 }
-cm_save(totals, paste0("~/Dropbox/COVID-UK/", analysis, "-totals.qs"));
-cm_save(dynamics, paste0("~/Dropbox/COVID-UK/", analysis, "-dynamics.qs"));
+cm_save(totals, paste0(covid_uk_path, analysis, "-totals.qs"));
+cm_save(dynamics, paste0(covid_uk_path, analysis, "-dynamics.qs"));
 print(Sys.time())
