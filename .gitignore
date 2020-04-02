@@ -1,5 +1,19 @@
+Icon*
+
 .DS_Store
 
 output/
 
 misc/
+
+covidm/build/
+
+submission/
+
+/*.pdf
+
+/*.csv
+
+/*.png
+
+/*.qs
