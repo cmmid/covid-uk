@@ -3,7 +3,6 @@
 
 # set up interventions
 # TODO remove reliance on cm_translate_parameters, for efficiency?
-# TODO I don't like that this has to set contact and fIs.
 cm_iv_build = function(parameters)
 {
     p = cm_translate_parameters(parameters)
@@ -13,7 +12,7 @@ cm_iv_build = function(parameters)
 cm_iv_checkset = function(iv, what, change)
 {
     if (!(what %in% names(iv))) {
-        iv[, (what) := list(rep(1, length(change)))];
+        iv[, (what) := rep(list(rep(1, length(change))), .N)];
     }
 }
 
