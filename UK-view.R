@@ -377,7 +377,7 @@ save_table(tb2, paste0(covid_uk_path, "/table-triggers.csv"));
 pl2 = plot_attackrate(t2)
 pl3 = plot_epi(d2, t2, (0:10)/10, "2020-01-29")
 f = plot_grid(pl1, pl2, pl3, ncol = 1, rel_heights = c(6, 6, 10), labels = c("a", "b", "c"), label_size = 9);
-ggsave(paste0(covid_uk_path, "/COVID-UK/full-2.pdf"), f, width = 20, height = 22, units = "cm", useDingbats = F);
+ggsave(paste0(covid_uk_path, "/full-2.pdf"), f, width = 20, height = 22, units = "cm", useDingbats = F);
 
 pla1 = plot_epi(d2[compartment != "deaths" & compartment != "beds_nonicu" & compartment != "beds_icu" &
                      scenario %like% "Local"], t2, (0:10)/10, "2020-01-29", "2020-8-31", exclude = "Base");
