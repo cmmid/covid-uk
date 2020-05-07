@@ -1,12 +1,12 @@
-Icon?
+Icon*
 
 .DS_Store
 
 *.pdf
 
-*.png
+covidm/build/
 
-*.csv
+submission/
 
 *.o
 
