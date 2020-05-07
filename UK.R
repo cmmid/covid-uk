@@ -5,9 +5,22 @@
 library(rlang)
 library(stringr)
 
+# Load requested settings from command line
+argv = commandArgs(trailingOnly = T);
+argc = length(argv);
+if (argc == 3) {
+    option.single = as.numeric(argv[argc-2]);
+} else if (argc != 2) {
+    stop("Must provide two arguments: analysis set and number of runs.");
+} else {
+    option.single = -1;
+}
+analysis = as.numeric(argv[argc-1]);
+n_runs = as.numeric(argv[argc]);
+
 # Set path
 # Set this path to the base directory of the repository.
-covid_uk_path = "~/Dropbox/COVID-UK"
+covid_uk_path = "~/Dropbox/COVID-UK/"
 
 # covidm options
 cm_path = paste0(covid_uk_path, "/covidm/");
@@ -47,11 +60,13 @@ for (j in seq_along(parameters$pop))
     mat = matrix(0, ncol = N, nrow = N);
 
     # Add child-grandparent contacts: under 15s to 55+s
-    for (a in 1:3) {
-        dist = c(rep(0, 10 + a), mat_ref[a, (11 + a):N]);
-        dist = dist/sum(dist);
-        mat[a, ] = mat[a, ] + gran * dist;
-        mat[, a] = mat[, a] + (gran * dist) * (popsize[a] / popsize);
+    if (analysis == 4) {
+        for (a in 1:3) {
+            dist = c(rep(0, 10 + a), mat_ref[a, (11 + a):N]);
+            dist = dist/sum(dist);
+            mat[a, ] = mat[a, ] + gran * dist;
+            mat[, a] = mat[, a] + (gran * dist) * (popsize[a] / popsize);
+        }
     }
     
     # Add child-grandparent contact matrix to population
@@ -84,6 +99,7 @@ P.icu_symp     = reformat(probs[, Prop_symp_hospitalised * Prop_hospitalised_cri
 P.nonicu_symp  = reformat(probs[, Prop_symp_hospitalised * (1 - Prop_hospitalised_critical)]);
 P.death_icu    = reformat(probs[, Prop_critical_fatal]);
 P.death_nonicu = reformat(probs[, Prop_noncritical_fatal]);
+hfr = probs[, Prop_noncritical_fatal / Prop_symp_hospitalised]
 
 
 burden_processes = list(
@@ -105,6 +121,9 @@ burden_processes = list(
 )
 parameters$processes = burden_processes
 
+clt_i = 1;
+clt_n = 0;
+
 # Observer for lockdown scenarios
 observer_lockdown = function(lockdown_trigger) function(time, dynamics)
 {
@@ -113,7 +132,7 @@ observer_lockdown = function(lockdown_trigger) function(time, dynamics)
     
     # Determine lockdown trigger
     trigger = lockdown_trigger;
-
+    
     # If ICU prevalence exceeds a threshold, turn on lockdown
     if (icu_prevalence >= trigger) {
         return (list(csv = paste(time, "trace_lockdown", "All", 2, sep = ","),
@@ -127,6 +146,7 @@ observer_lockdown = function(lockdown_trigger) function(time, dynamics)
 
 # Load age-varying symptomatic rate
 covid_scenario = qread(paste0(covid_uk_path, "/data/2-linelist_symp_fit_fIa0.5.qs"));
+#covid_scenario2 = qread(paste0(covid_uk_path, "/data/2-linelist_both_fit_fIa0.5-rbzvi.qs"));
 
 # Identify London boroughs for early seeding, and regions of each country for time courses
 london = cm_structure_UK[match(str_sub(locations, 6), Name), Geography1 %like% "London"]
@@ -196,14 +216,6 @@ add_dynamics = function(run, dynamics, iv)
 #############
 # MAIN CODE #
 #############
-
-argv = commandArgs(trailingOnly = T);
-argc = length(argv);
-if (argc != 2) {
-    stop("Must provide two arguments: analysis set and number of runs.");
-}
-analysis = as.numeric(argv[argc-1]);
-n_runs = as.numeric(argv[argc]);
 
 if (analysis == 1) {
     # Define school terms, base versus intervention (both same here)
@@ -331,7 +343,16 @@ totals = data.table()
 print(Sys.time())
 set.seed(1234567);
 
-for (r in 1:n_runs) {
+print(paste0(covid_uk_path, analysis, "-dynamics", ifelse(option.single > 0, option.single, ""), ".qs"))
+
+if (option.single < 0) {
+    run_set = 1:n_runs;
+} else {
+    run_set = option.single;
+    set.seed(1234 + option.single);
+}
+
+for (r in run_set) {
     cat(paste0(r, ": R0 = ", R0s[r], "\n"));
 
     # 1. Pick age-varying symptomatic rate
@@ -406,7 +427,7 @@ for (r in 1:n_runs) {
     dynamics = add_dynamics(run, dynamics, iv);
     peak_t = run$dynamics[compartment == "cases", .(total_cases = sum(value)), by = t][, t[which.max(total_cases)]];
     peak_t_bypop = run$dynamics[compartment == "cases", .(total_cases = sum(value)), by = .(t, population)][, t[which.max(total_cases)], by = population]$V1;
-    
+
     rm(run)
     gc()
 
@@ -438,18 +459,24 @@ for (r in 1:n_runs) {
                 }
                 
                 if (trigger == "local") {
-                    # Apply interventions to one population at a time.
+                    # Trigger interventions in one population at a time.
                     for (pi in seq_along(params$pop)) {
                         ymd_start = ymd(params$date0) + intervention_start[pi];
                         ymd_end = ymd_start + duration - 1;
                         iv = cm_iv_build(params)
                         cm_iv_set(iv, school_close_i, school_reopen_i, contact = c(1, 1, 0, 1,  1, 1, 0, 1,  1), trace_school = 2);
                         cm_iv_set(iv, ymd_start, ymd_end, interventions[[i]]);
+                        # Comment above line and uncomment next 5 lines for "variation in adherence between counties" analysis
+                        # interv = rlang::duplicate(interventions[[i]]);
+                        # p = runif(1);
+                        # interv[[1]] = qbeta(p, 20 * interv[[1]], 20 * (1 - interv[[1]]));
+                        # interv[[2]] = qbeta(p, 20 * interv[[2]], 20 * (1 - interv[[2]]));
+                        # cm_iv_set(iv, ymd_start, ymd_end, interv);
                         cm_iv_set(iv, ymd_start, ymd_end, trace_intervention = 2);
                         params = cm_iv_apply(params, iv, pi);
                     }
                 } else {
-                    # Apply interventions to entire population.
+                    # Trigger interventions all at once.
                     ymd_start = ymd(params$date0) + intervention_start;
                     ymd_end = ymd_start + duration - 1;
                     iv = cm_iv_build(params)
@@ -483,6 +510,6 @@ for (r in 1:n_runs) {
       }
     }
 }
-cm_save(totals, paste0(covid_uk_path, analysis, "-totals.qs"));
-cm_save(dynamics, paste0(covid_uk_path, analysis, "-dynamics.qs"));
+cm_save(totals, paste0(covid_uk_path, analysis, "-totals", ifelse(option.single > 0, option.single, ""), ".qs"));
+cm_save(dynamics, paste0(covid_uk_path, analysis, "-dynamics", ifelse(option.single > 0, option.single, ""), ".qs"));
 print(Sys.time())

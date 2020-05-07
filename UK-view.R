@@ -2,6 +2,7 @@
 # UK model: plot outputs
 # - - - - - - - - - - - - - - - - - - - - - - - 
 
+library(ggplot2)
 library(cowplot)
 library(stringr)
 library(rlang)
@@ -66,8 +67,7 @@ deaths, peak, week
 beds_icu, peak, t
 beds_nonicu, peak, t
 cases, peak_time, week
-trace_lockdown, lockdown_duration, t
-subclinical, total, t")
+trace_lockdown, lockdown_duration, t")
 
 median_ci = function(x, conf = 0.95)
 {
@@ -77,7 +77,7 @@ median_ci = function(x, conf = 0.95)
     return (y)
 }
 
-make_table = function(d)
+make_table = function(d, table_spec = table_spec)
 {
     d[, week := t %/% 7]
     results = NULL
@@ -93,6 +93,18 @@ make_table = function(d)
             res = res[, median_ci(x), by = .(scenario, region, statistic)];
             stat_nice = paste("Total", comp);
         } else if (stat == "peak") {
+            # res = d[region == "United Kingdom" & compartment == comp, .(x = sum(value)), by = c("scenario", "run", "t", "region")];
+            # if (time == "week") {
+            #     res = merge(res, res[, .(peak_day = t[which.max(x)]), by = .(scenario, run, region)]);
+            #     res[, in_peak_week := abs(t - peak_day) <= 3];
+            #     res = res[in_peak_week == T, .(x = sum(x)), by = .(scenario, run, region)];
+            # } else {
+            #     res = res[, .(x = max(x)), by = .(scenario, run, region)];
+            # }
+            # res[, statistic := paste(stat, comp)];
+            # res = res[, median_ci(x), by = .(scenario, region, statistic)];
+            # stat_nice = ifelse(time == "t", paste("Peak", comp, "required"),
+            #     paste(comp, "in peak week"));
             res = d[region == "United Kingdom" & compartment == comp, .(x = sum(value)), by = c("scenario", "run", time, "region")];
             res = res[, .(x = max(x)), by = .(scenario, run, region)];
             res[, statistic := paste(stat, comp)];
@@ -241,6 +253,10 @@ plot_epi = function(d0, t, quant, ymd_start, ymd_truncate = "2050-01-01", colour
     qrun = t[scenario == "Base", sum(total), by = run][, which(rank(V1) %in% round(1 + (.N - 1) * quant))];
     d = d[run %in% qrun];
     
+    if (d[, max(run) == 5]) {
+        mrun = 5;
+    }
+    
     # Merge intervention traces
     trace_school = d[compartment == "trace_school", .(run, t, trace_school = value - 1, scenario)]
     d = merge(d, trace_school, by = c("run", "t", "scenario"), all.x = T);
@@ -297,12 +313,15 @@ plot_epi = function(d0, t, quant, ymd_start, ymd_truncate = "2050-01-01", colour
 theme_set(theme_cowplot(font_size = 7, line_size = 0.25))
 
 # load data
+covid_uk_path = paste0(covid_uk_path, "/output/may7")
 d1 =   reflow_dynamics(qread(paste0(covid_uk_path, "/1-dynamics.qs")));
 t1 =     reflow_totals(qread(paste0(covid_uk_path, "/1-totals.qs")));
 d2.1 = reflow_dynamics(qread(paste0(covid_uk_path, "/2.1-dynamics.qs")));
 t2.1 =   reflow_totals(qread(paste0(covid_uk_path, "/2.1-totals.qs")));
 d2.2 = reflow_dynamics(qread(paste0(covid_uk_path, "/2.2-dynamics.qs")));
 t2.2 =   reflow_totals(qread(paste0(covid_uk_path, "/2.2-totals.qs")));
+d2.2v =reflow_dynamics(qread(paste0(covid_uk_path, "/2.2V-dynamics.qs")));
+t2.2v =  reflow_totals(qread(paste0(covid_uk_path, "/2.2V-totals.qs")));
 d3 =   reflow_dynamics(qread(paste0(covid_uk_path, "/3-dynamics.qs")));
 t3 =     reflow_totals(qread(paste0(covid_uk_path, "/3-totals.qs")));
 d4 =   reflow_dynamics(qread(paste0(covid_uk_path, "/4-dynamics.qs")));
@@ -353,6 +372,11 @@ f = plot_grid(pla1, plb, pla2, plR,
     nrow = 2, ncol = 2, rel_widths = c(3, 2), labels = c("a", "b", "", "c"), label_size = 9, align = "hv", axis = "bottom")
 ggsave(paste0(covid_uk_path, "/fig-12week.pdf"), f, width = 20, height = 12, units = "cm", useDingbats = F);
 
+ggsave(paste0(covid_uk_path, "/fig-12week-a.pdf"), plot_grid(pla1, pla2, ncol = 1, align = "hv", axis = "bottom"), 
+  width = 12, height = 12, units = "cm", useDingbats = F);
+ggsave(paste0(covid_uk_path, "/fig-12week-b.pdf"), plb, width = 8, height = 6, units = "cm", useDingbats = F);
+ggsave(paste0(covid_uk_path, "/fig-12week-c.pdf"), plR, width = 8, height = 6, units = "cm", useDingbats = F);
+
 # ANALYSIS 2 - TRIGGERS
 d2.1[scenario != "Base", scenario := paste(scenario, "national")]
 d2.2[scenario != "Base", scenario := paste(scenario, "local")]
@@ -377,7 +401,7 @@ save_table(tb2, paste0(covid_uk_path, "/table-triggers.csv"));
 pl2 = plot_attackrate(t2)
 pl3 = plot_epi(d2, t2, (0:10)/10, "2020-01-29")
 f = plot_grid(pl1, pl2, pl3, ncol = 1, rel_heights = c(6, 6, 10), labels = c("a", "b", "c"), label_size = 9);
-ggsave(paste0(covid_uk_path, "/COVID-UK/full-2.pdf"), f, width = 20, height = 22, units = "cm", useDingbats = F);
+ggsave(paste0(covid_uk_path, "/full-2.pdf"), f, width = 20, height = 22, units = "cm", useDingbats = F);
 
 pla1 = plot_epi(d2[compartment != "deaths" & compartment != "beds_nonicu" & compartment != "beds_icu" &
         scenario %like% "Local"], t2, (0:10)/10, "2020-01-29", "2020-8-31", exclude = "Base");
@@ -407,15 +431,18 @@ plc = plot_grid(plc1, plc2, plc3, nrow = 3, align = "v", axis = "bottom", rel_he
 f = plot_grid(pla, plb, plc,
     ncol = 3, labels = c("a", "b", "c"), label_size = 9, rel_widths = c(2, 1, .5))
 ggsave(paste0(covid_uk_path, "/fig-triggers.pdf"), f, width = 20, height = 8, units = "cm", useDingbats = F);
+ggsave(paste0(covid_uk_path, "/fig-triggers-a.pdf"), pla, width = 20*4/7, height = 8, units = "cm", useDingbats = F);
+ggsave(paste0(covid_uk_path, "/fig-triggers-b.pdf"), plb, width = 20*2/7, height = 8, units = "cm", useDingbats = F);
+ggsave(paste0(covid_uk_path, "/fig-triggers-c.pdf"), plc, width = 20*1/7, height = 8, units = "cm", useDingbats = F);
 
 # ANALYSIS 3 - LOCKDOWN
 d3[scenario == "Intensive Interventions NA lockdown", scenario := "Intensive Interventions"];
 d3[scenario == "Intensive Interventions 1000 lockdown", scenario := "Lockdown 1000-bed trigger"];
 d3[scenario == "Intensive Interventions 2000 lockdown", scenario := "Lockdown 2000-bed trigger"];
 d3[scenario == "Intensive Interventions 5000 lockdown", scenario := "Lockdown 5000-bed trigger"];
-#d3[compartment == "subclinical"]$value = d3[compartment == "subclinical"]$value + d3[compartment == "cases"]$value
+d3[compartment == "subclinical"]$value = d3[compartment == "subclinical"]$value + d3[compartment == "cases"]$value
 
-tb3 = make_table(d3)
+tb3 = make_table(d3, rbind(table_spec, data.table(compartment = "subclinical", stat = "total", time = "t")))
 pl1 = plot_table(tb3)
 save_table(tb3, paste0(covid_uk_path, "/table-lockdown.csv"));
 pl2 = plot_attackrate(t3)
@@ -461,6 +488,11 @@ plR = ggplot(r0s2) +
 f = plot_grid(pla1, plb, pla2, plR, 
     nrow = 2, ncol = 2, rel_widths = c(3, 2), labels = c("a", "b", "", "c"), label_size = 9, align = "hv", axis = "bottom")
 ggsave(paste0(covid_uk_path, "/fig-lockdown.pdf"), f, width = 20, height = 12, units = "cm", useDingbats = F);
+ggsave(paste0(covid_uk_path, "/fig-lockdown-a.pdf"), plot_grid(pla1, pla2, ncol = 1, align = "hv", axis = "bottom"), 
+  width = 12, height = 12, units = "cm", useDingbats = F);
+ggsave(paste0(covid_uk_path, "/fig-lockdown-b.pdf"), plb, width = 8, height = 6, units = "cm", useDingbats = F);
+ggsave(paste0(covid_uk_path, "/fig-lockdown-c.pdf"), plR, width = 8, height = 6, units = "cm", useDingbats = F);
+
 
 # ANALYSES 4,6 - GRANDPARENTS AND SPORTS/LEISURE
 # Grandparents
@@ -504,8 +536,127 @@ pla = plot_table(tb6[scenario != "Base" & statistic != "Deaths in peak week"]) +
     guides(colour = guide_legend(nrow = 3, byrow = TRUE)) + labs(colour = NULL)
 f = plot_grid(pla, plb, nrow = 2, labels = c("a", "b"), label_size = 9, align = "hv", axis = "bottom");
 ggsave(paste0(covid_uk_path, "/fig-misc.pdf"), f, width = 9, height = 12, units = "cm", useDingbats = F);
+ggsave(paste0(covid_uk_path, "/fig-misc-a.pdf"), pla, width = 9, height = 6, units = "cm", useDingbats = F);
+ggsave(paste0(covid_uk_path, "/fig-misc-b.pdf"), plb, width = 9, height = 6, units = "cm", useDingbats = F);
 
+
+# TOTAL INFECTIONS
+1 - quantile(d1[scenario == "Base" & compartment == "S" & t == 702 & region == "United Kingdom"]$value / 
+  d1[scenario == "Base" & compartment == "S" & t == 0 & region == "United Kingdom"]$value, c(0.025, 0.5, 0.975))
+
+# CASES AMONG INFECTIONS
+cases = d1[scenario == "Base" & compartment == "cases" & region == "United Kingdom", sum(value), by = run]
+subclin = d1[scenario == "Base" & compartment == "subclinical" & region == "United Kingdom", sum(value), by = run]
+quantile(cases$V1 / (cases$V1 + subclin$V1), c(0.025, 0.5, 0.975))
+
+# STOPPED EPIDEMICS FROM COMBINED INTERVENTION (DURING CONTROL PERIOD)
+r0s[scenario == "Combination", sum(R0 < 1)]
+
+# SPORTS/LEISURE IMPACT
+quantile(1 - d6[scenario == "Spectator sports banned" & compartment == "cases" & region == "United Kingdom", sum(value), by = run]$V1 /
+  d6[scenario == "Background" & compartment == "cases" & region == "United Kingdom", sum(value), by = run]$V1, c(0.025, 0.5, 0.975))
+
+quantile(1 - d6[scenario == "Leisure reduced by 75%" & compartment == "cases" & region == "United Kingdom", sum(value), by = run]$V1 /
+  d6[scenario == "Background" & compartment == "cases" & region == "United Kingdom", sum(value), by = run]$V1, c(0.025, 0.5, 0.975))
+
+# INTENSIVE INTERVENTIONS IMPACT (DEATHS)
+# SPORTS/LEISURE IMPACT
+quantile(1 - d3[scenario == "Intensive Interventions" & compartment == "deaths" & region == "United Kingdom", sum(value), by = run]$V1 /
+  d1[scenario == "Base" & compartment == "deaths" & region == "United Kingdom", sum(value), by = run]$V1, c(0.025, 0.5, 0.975))
 
 # NINGBO EST.
 x = rbeta(100000, 6, 140)/rbeta(100000, 126, 1875)
 cm_mean_hdi(x)
+
+# COMPARISON WITH UK DEATHS
+ukdeaths = fread(
+"Area name	Area code	Area type	Reporting date	Daily hospital deaths	Cumulative hospital deaths
+United Kingdom	K02000001	UK	2020-03-27	181	759
+United Kingdom	K02000001	UK	2020-03-26	115	578
+United Kingdom	K02000001	UK	2020-03-25	41	463
+United Kingdom	K02000001	UK	2020-03-24	87	422
+United Kingdom	K02000001	UK	2020-03-23	54	335
+United Kingdom	K02000001	UK	2020-03-22	48	281
+United Kingdom	K02000001	UK	2020-03-21	56	233
+United Kingdom	K02000001	UK	2020-03-20	33	177
+United Kingdom	K02000001	UK	2020-03-19	41	144
+United Kingdom	K02000001	UK	2020-03-18	32	103
+United Kingdom	K02000001	UK	2020-03-17	16	71
+United Kingdom	K02000001	UK	2020-03-16	20	55
+United Kingdom	K02000001	UK	2020-03-15	14	35
+United Kingdom	K02000001	UK	2020-03-14		21
+United Kingdom	K02000001	UK	2020-03-13		8
+United Kingdom	K02000001	UK	2020-03-12		8
+United Kingdom	K02000001	UK	2020-03-11		6
+United Kingdom	K02000001	UK	2020-03-10		6")
+
+deaths = d1[scenario == "Base" & compartment == "deaths" & region == "United Kingdom", cm_mean_hdi(value), by = t]
+ggplot(deaths[t < 60]) + 
+    geom_ribbon(aes(x = ymd("2020-01-29") + t, ymin = lower, ymax = upper), alpha = 0.25) +
+    geom_line(aes(x = ymd("2020-01-29") + t, y = mean)) +
+    geom_point(data = ukdeaths, aes(x = ymd(`Reporting date`), y = `Daily hospital deaths`), colour = "red") +
+    labs(x = "Date", y = "Daily hospital deaths")
+
+# VARIATION SENSITIVITY
+#        `Combination`       = list(contact = c(1.0, 0.5, 0.0, 0.5,  1.0, 0.25, 0.0, 0.25,  0), fIs = rep(0.65, 16))
+
+dists = data.table(x = (0:100)/100);
+dists[, d50 := dbeta(x, 10, 10)];
+dists[, d25 := dbeta(x,  5, 15)];
+dists[, d65 := dbeta(x, 13,  7)];
+
+pll = ggplot(dists, aes(x = x)) +
+  geom_line(aes(y = d50/max(d50), colour = "Work, other contacts in under-70s"), linetype = "dashed") +
+  geom_line(aes(y = d25/max(d25), colour = "Work, other contacts in over-70s"), linetype = "dashed") +
+  geom_line(aes(y = d65/max(d65), colour = "Infectiousness of symptomatic individuals"), linetype = "dashed") +
+  geom_pointrange(aes(x = 0.50, ymin = 0, ymax = 1, y = 1, colour = "Work, other contacts in under-70s"), size = 0.25, fatten = 0.2) +
+  geom_pointrange(aes(x = 0.25, ymin = 0, ymax = 1, y = 1, colour = "Work, other contacts in over-70s"), size = 0.25, fatten = 0.2) +
+  geom_pointrange(aes(x = 0.65, ymin = 0, ymax = 1, y = 1, colour = "Infectiousness of symptomatic individuals"), size = 0.25, fatten = 0.2) +
+  labs(colour = NULL, x = NULL, y = "Normalised density") +
+  guides(colour = guide_legend(nrow = 3, byrow = TRUE, reverse = TRUE)) + 
+  theme(legend.position = "bottom")
+
+d7 = rbind(
+  d2.2[scenario == "Base"],
+  d2.2[scenario == "Combination 28 shift local"],
+  d2.2v[scenario == "Combination"]
+)
+t7 = rbind(
+  t2.2[scenario == "Base"],
+  t2.2[scenario == "Combination 28 shift local"],
+  t2.2v[scenario == "Combination"]
+)
+d7[scenario == "Combination 28 shift local", scenario := "No variation"]
+d7[scenario == "Combination", scenario := "Variation"]
+t7[scenario == "Combination 28 shift local", scenario := "No variation"]
+t7[scenario == "Combination", scenario := "Variation"]
+
+tb7 = make_table(d7)
+pl1 = plot_table(tb7[scenario != "Base"])
+save_table(tb7, paste0(covid_uk_path, "/table-variation.csv"));
+pl2 = plot_attackrate(t7)
+pl3 = plot_epi(d7, t7, (0:10)/10, "2020-01-29")
+f = plot_grid(pl1, pl2, pl3, ncol = 1, rel_heights = c(6, 6, 10), labels = c("a", "b", "c"), label_size = 9);
+ggsave(paste0(covid_uk_path, "/full-7.pdf"), f, width = 20, height = 22, units = "cm", useDingbats = F);
+
+pla = plot_epi(d7[compartment != "deaths" & compartment != "beds_nonicu"], t7, (0:10)/10, "2020-01-29", "2020-10-15", 
+        colours = cols4[1:3], exclude = "Base");
+tb7[statistic == "Cases in peak week", statistic := "Cases in\npeak week"];
+tb7[statistic == "Peak ICU beds required", statistic := "Peak ICU beds\nrequired"];
+tb7[statistic == "Peak non-ICU beds required", statistic := "Peak non-ICU beds\nrequired"];
+tb7[statistic == "Time to peak cases (weeks)", statistic := "Time to peak\ncases (weeks)"];
+plb = plot_table(tb7[statistic != "Deaths in peak week" & statistic != "Total subclinical" & scenario != "Base"]) + theme(legend.position = "bottom") + 
+    guides(colour = guide_legend(nrow = 3, byrow = TRUE)) + labs(colour = NULL)
+
+googen = fread(paste0(covid_uk_path, "/../../data/Global_Mobility_Report.csv")); # Google global mobility report
+googen = googen[country_region_code == "GB"];
+googen = googen[date >= "2020-04-01" & date <= "2020-04-07", mean(workplaces_percent_change_from_baseline), by = sub_region_1]
+plc = ggplot(googen) + 
+  geom_histogram(aes(x = 1 + V1/100)) + 
+  xlim(0, 1) +
+  labs(x = "Relative workplace\nvisits, 1-7 April 2020", y = "Count")
+
+f = plot_grid(pll, pla, plb, plc,
+    nrow = 1, ncol = 4, rel_widths = c(1.0, 1.3, 1.6, 0.8), labels = c("a", "b", "c", "d"), label_size = 9, align = "hv", axis = "bottom")
+ggsave(paste0(covid_uk_path, "/fig-variation.pdf"), f, width = 24, height = 6, units = "cm", useDingbats = F);
+ggsave(paste0(covid_uk_path, "/fig-variation.png"), f, width = 24, height = 6, units = "cm");

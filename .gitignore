@@ -2,14 +2,18 @@ Icon?
 
 .DS_Store
 
-*.qs
-
 *.pdf
 
 *.png
 
 *.csv
 
+*.o
+
 output/
 
 misc/
+
+submission/
+
+covidm/build/*
